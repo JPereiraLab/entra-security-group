@@ -9,3 +9,13 @@ variable "group_description" {
   type        = string
   default     = "Created via Terraform"
 }
+
+variable "entra_client_id" {
+  description = "Client ID of the Entra app registration in the joaolab tenant (for managing Entra resources)"
+  type        = string
+}
+
+variable "entra_tenant_id" {
+  description = "Tenant ID of the joaolab tenant"
+  type        = string
+}
