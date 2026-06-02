@@ -31,12 +31,15 @@ jobs:
         id: azure-token
         shell: pwsh
         run: |
+          $oidcToken = "${{ steps.get-token.outputs.oidc_token }}"
+          
           $body = @{
             "client_id" = "${{ secrets.AZURE_CLIENT_ID }}"
-            "client_assertion" = "${{ steps.get-token.outputs.oidc_token }}"
-            "client_assertion_type" = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
-            "grant_type" = "client_credentials"
-            "scope" = "https://graph.microsoft.com/.default"
+            "assertion" = $oidcToken
+            "grant_type" = "urn:ietf:params:oauth:grant-type:token-exchange"
+            "subject_token_type" = "urn:ietf:params:oauth:token-type:id_token"
+            "requested_token_use" = "on_behalf_of"
+            "resource" = "https://graph.microsoft.com"
           }
           
           $bodyString = ($body.GetEnumerator() | ForEach-Object { "$($_.Key)=$([Uri]::EscapeDataString($_.Value))" }) -join "&"
@@ -48,7 +51,7 @@ jobs:
             -Body $bodyString
           
           echo "access_token=$($response.access_token)" >> $env:GITHUB_OUTPUT
-          Write-Host "Azure token obtained successfully"
+          Write-Host "Azure token obtained"
 
       - name: Create Security Group
         shell: pwsh
