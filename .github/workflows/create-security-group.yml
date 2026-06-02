@@ -14,7 +14,6 @@ permissions:
 jobs:
   create-group:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Get token via OIDC
         id: get-token
@@ -23,9 +22,8 @@ jobs:
           $token = Invoke-RestMethod `
             -Uri $env:ACTIONS_ID_TOKEN_REQUEST_URL `
             -Headers @{ "Authorization" = "bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" } | Select-Object -ExpandProperty token
-          
           echo "oidc_token=$token" >> $env:GITHUB_OUTPUT
-      
+
       - name: Exchange OIDC token for Azure token
         id: azure-token
         shell: pwsh
@@ -37,13 +35,31 @@ jobs:
             "grant_type" = "client_credentials"
             "scope" = "https://graph.microsoft.com/.default"
           } | ConvertTo-Json
-          
           $response = Invoke-RestMethod `
             -Uri "https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}/oauth2/v2.0/token" `
             -Method POST `
             -ContentType "application/json" `
             -Body $body
-          
           echo "access_token=$($response.access_token)" >> $env:GITHUB_OUTPUT
-      
-      - name
+
+      - name: Create Security Group
+        shell: pwsh
+        run: |
+          $headers = @{
+            Authorization = "Bearer ${{ steps.azure-token.outputs.access_token }}"
+            "Content-Type" = "application/json"
+          }
+          $groupBody = @{
+            displayName = "${{ github.event.inputs.group_name }}"
+            mailEnabled = $false
+            securityEnabled = $true
+            mailNickname = "${{ github.event.inputs.group_name }}".Replace(" ", "") -Replace "[^a-zA-Z0-9]", ""
+          } | ConvertTo-Json
+          $response = Invoke-RestMethod `
+            -Uri "https://graph.microsoft.com/v1.0/groups" `
+            -Method POST `
+            -Headers $headers `
+            -Body $groupBody
+          Write-Host "✅ Security group created!"
+          Write-Host "Group ID: $($response.id)"
+          Write-Host "Display Name: $($response.displayName)"
