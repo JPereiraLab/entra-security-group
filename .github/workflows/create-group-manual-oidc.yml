@@ -1,0 +1,80 @@
+name: Create Entra Group (Manual OIDC)
+
+on:
+  workflow_dispatch:
+    inputs:
+      group_name:
+        description: 'Security Group Name'
+        required: true
+        default: 'Test-Group'
+
+permissions:
+  id-token: write
+
+jobs:
+  create-group:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Azure Token
+        id: azure-token
+        shell: pwsh
+        run: |
+          # Get OIDC token from GitHub
+          $oidcResponse = Invoke-RestMethod `
+            -Uri "$($env:ACTIONS_ID_TOKEN_REQUEST_URL)&audience=api://AzureADTokenExchange" `
+            -Headers @{ "Authorization" = "bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" }
+          
+          $oidcToken = $oidcResponse.value
+          Write-Host "OIDC token length: $($oidcToken.Length)"
+          
+          # Exchange for Azure token
+          $body = @{
+            client_id = "${{ secrets.AZURE_CLIENT_ID }}"
+            client_assertion = $oidcToken
+            client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+            grant_type = "client_credentials"
+            scope = "https://graph.microsoft.com/.default"
+          }
+          
+          $bodyString = ($body.GetEnumerator() | ForEach-Object { 
+            "$($_.Key)=$([Uri]::EscapeDataString($_.Value))" 
+          }) -join "&"
+          
+          $tokenUrl = "https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}/oauth2/v2.0/token"
+          
+          try {
+            $response = Invoke-RestMethod -Uri $tokenUrl -Method POST `
+              -ContentType "application/x-www-form-urlencoded" -Body $bodyString
+            
+            echo "access_token=$($response.access_token)" >> $env:GITHUB_OUTPUT
+            Write-Host "✅ Azure token obtained"
+          } catch {
+            Write-Host "Error: $($_.Exception.Message)"
+            Write-Host "Response: $($_.ErrorDetails.Message)"
+            throw
+          }
+
+      - name: Create Security Group
+        shell: pwsh
+        run: |
+          $headers = @{
+            Authorization = "Bearer ${{ steps.azure-token.outputs.access_token }}"
+            "Content-Type" = "application/json"
+          }
+          
+          $groupBody = @{
+            displayName = "${{ github.event.inputs.group_name }}"
+            mailEnabled = $false
+            securityEnabled = $true
+            mailNickname = "${{ github.event.inputs.group_name }}".Replace(" ", "") -Replace "[^a-zA-Z0-9]", ""
+          } | ConvertTo-Json
+          
+          $response = Invoke-RestMethod `
+            -Uri "https://graph.microsoft.com/v1.0/groups" `
+            -Method POST `
+            -Headers $headers `
+            -Body $groupBody
+          
+          Write-Host "✅ Security group created!"
+          Write-Host "Group ID: $($response.id)"
+          Write-Host "Display Name: $($response.displayName)"
