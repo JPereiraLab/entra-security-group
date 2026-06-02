@@ -1,4 +1,4 @@
-name: Create Entra Security Group
+name: Create Entra Group (azure/login@v2)
 
 on:
   workflow_dispatch:
