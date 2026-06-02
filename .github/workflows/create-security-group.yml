@@ -19,10 +19,13 @@ jobs:
         id: get-token
         shell: pwsh
         run: |
-          $token = Invoke-RestMethod `
+          $response = Invoke-RestMethod `
             -Uri $env:ACTIONS_ID_TOKEN_REQUEST_URL `
-            -Headers @{ "Authorization" = "bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" } | Select-Object -ExpandProperty token
+            -Headers @{ "Authorization" = "bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" }
+          
+          $token = $response.token
           echo "oidc_token=$token" >> $env:GITHUB_OUTPUT
+          Write-Host "Token obtained successfully"
 
       - name: Exchange OIDC token for Azure token
         id: azure-token
