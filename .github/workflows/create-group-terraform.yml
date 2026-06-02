@@ -20,9 +20,11 @@ jobs:
         working-directory: ./terraform
 
     env:
+      # These are used by the BACKEND (azurerm) for state storage (tenant 2)
       ARM_USE_OIDC: true
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_CLIENT_ID: ${{ secrets.AZURE_STATE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_STATE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_STATE_SUBSCRIPTION_ID }}
 
     steps:
       - name: Checkout
@@ -32,25 +34,23 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.AZURE_STATE_RG }}" \
+            -backend-config="storage_account_name=${{ secrets.AZURE_STATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=entra-security-group.tfstate"
 
       - name: Terraform Plan
         run: |
           terraform plan \
-            -var="group_name=${{ github.event.inputs.group_name }}"
+            -var="group_name=${{ github.event.inputs.group_name }}" \
+            -var="entra_client_id=${{ secrets.AZURE_CLIENT_ID }}" \
+            -var="entra_tenant_id=${{ secrets.AZURE_TENANT_ID }}"
 
       - name: Terraform Apply
         run: |
           terraform apply -auto-approve \
-            -var="group_name=${{ github.event.inputs.group_name }}"
-
-      - name: Show State
-        run: |
-          echo "=== Resources in state ==="
-          terraform state list
-          echo ""
-          echo "=== Full state details ==="
-          terraform show
-          echo ""
-          echo "=== Raw state file ==="
-          cat terraform.tfstate
+            -var="group_name=${{ github.event.inputs.group_name }}" \
+            -var="entra_client_id=${{ secrets.AZURE_CLIENT_ID }}" \
+            -var="entra_tenant_id=${{ secrets.AZURE_TENANT_ID }}"
