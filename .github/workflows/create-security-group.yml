@@ -21,7 +21,7 @@ jobs:
         run: |
           # Get OIDC token from GitHub
           $oidcResponse = Invoke-RestMethod `
-            -Uri $env:ACTIONS_ID_TOKEN_REQUEST_URL `
+            -Uri "$($env:ACTIONS_ID_TOKEN_REQUEST_URL)&audience=api://AzureADTokenExchange" `
             -Headers @{ "Authorization" = "bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" }
           
           $oidcToken = $oidcResponse.value
