@@ -1,1 +1,29 @@
+name: Create Entra Security Group
 
+on:
+  workflow_dispatch:
+    inputs:
+      group_name:
+        description: 'Security Group Name'
+        required: true
+        default: 'Test-Group'
+
+permissions:
+  id-token: write
+
+jobs:
+  create-group:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Get token via OIDC
+        id: get-token
+        shell: pwsh
+        run: |
+          $response = Invoke-WebRequest `
+            -Uri "https://token.actions.githubusercontent.com/?audience=api://AzureADTokenExchange" `
+            -Headers @{ "Authorization" = "bearer ${{ secrets.GITHUB_TOKEN }}" } `
+            -Method GET
+          
+          $token = $response.Content | ConvertFrom-Json | Select-Object -ExpandProperty token
+          echo "oidc_token=$token" >> $env:GITHUB_OUTPUT
