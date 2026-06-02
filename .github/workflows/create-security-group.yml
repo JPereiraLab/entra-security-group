@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Get token via OIDC
+      - name: Get token via OIDC
         id: get-token
         shell: pwsh
         run: |
@@ -25,3 +25,25 @@ jobs:
             -Headers @{ "Authorization" = "bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" } | Select-Object -ExpandProperty token
           
           echo "oidc_token=$token" >> $env:GITHUB_OUTPUT
+      
+      - name: Exchange OIDC token for Azure token
+        id: azure-token
+        shell: pwsh
+        run: |
+          $body = @{
+            "client_id" = "${{ secrets.AZURE_CLIENT_ID }}"
+            "client_assertion" = "${{ steps.get-token.outputs.oidc_token }}"
+            "client_assertion_type" = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+            "grant_type" = "client_credentials"
+            "scope" = "https://graph.microsoft.com/.default"
+          } | ConvertTo-Json
+          
+          $response = Invoke-RestMethod `
+            -Uri "https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}/oauth2/v2.0/token" `
+            -Method POST `
+            -ContentType "application/json" `
+            -Body $body
+          
+          echo "access_token=$($response.access_token)" >> $env:GITHUB_OUTPUT
+      
+      - name
