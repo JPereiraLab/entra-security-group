@@ -31,27 +31,28 @@ jobs:
         id: azure-token
         shell: pwsh
         run: |
+          $clientId = "${{ secrets.AZURE_CLIENT_ID }}"
+          $tenantId = "${{ secrets.AZURE_TENANT_ID }}"
           $oidcToken = "${{ steps.get-token.outputs.oidc_token }}"
           
           $body = @{
-            "client_id" = "${{ secrets.AZURE_CLIENT_ID }}"
-            "assertion" = $oidcToken
-            "grant_type" = "urn:ietf:params:oauth:grant-type:token-exchange"
-            "subject_token_type" = "urn:ietf:params:oauth:token-type:id_token"
-            "requested_token_use" = "on_behalf_of"
-            "resource" = "https://graph.microsoft.com"
+            client_id = $clientId
+            client_assertion = $oidcToken
+            client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+            grant_type = "client_credentials"
+            scope = "https://graph.microsoft.com/.default"
           }
           
-          $bodyString = ($body.GetEnumerator() | ForEach-Object { "$($_.Key)=$([Uri]::EscapeDataString($_.Value))" }) -join "&"
+          $bodyString = ($body.GetEnumerator() | ForEach-Object { 
+            "$($_.Key)=$([Uri]::EscapeDataString($_.Value))" 
+          }) -join "&"
           
-          $response = Invoke-RestMethod `
-            -Uri "https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}/oauth2/v2.0/token" `
-            -Method POST `
-            -ContentType "application/x-www-form-urlencoded" `
-            -Body $bodyString
+          $tokenUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
+          $response = Invoke-RestMethod -Uri $tokenUrl -Method POST `
+            -ContentType "application/x-www-form-urlencoded" -Body $bodyString
           
           echo "access_token=$($response.access_token)" >> $env:GITHUB_OUTPUT
-          Write-Host "Azure token obtained"
+          Write-Host "✅ Azure token obtained"
 
       - name: Create Security Group
         shell: pwsh
