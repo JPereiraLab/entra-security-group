@@ -43,3 +43,14 @@ jobs:
         run: |
           terraform apply -auto-approve \
             -var="group_name=${{ github.event.inputs.group_name }}"
+
+      - name: Show State
+        run: |
+          echo "=== Resources in state ==="
+          terraform state list
+          echo ""
+          echo "=== Full state details ==="
+          terraform show
+          echo ""
+          echo "=== Raw state file ==="
+          cat terraform.tfstate
