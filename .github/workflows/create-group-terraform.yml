@@ -1,0 +1,45 @@
+name: Create Entra Group (Terraform)
+
+on:
+  workflow_dispatch:
+    inputs:
+      group_name:
+        description: 'Security Group Name'
+        required: true
+        default: 'Test-Group-Terraform'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./terraform
+
+    env:
+      ARM_USE_OIDC: true
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var="group_name=${{ github.event.inputs.group_name }}"
+
+      - name: Terraform Apply
+        run: |
+          terraform apply -auto-approve \
+            -var="group_name=${{ github.event.inputs.group_name }}"
