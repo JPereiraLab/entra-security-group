@@ -2,11 +2,11 @@ name: Create Entra Group (Terraform)
 
 on:
   workflow_dispatch:
-    inputs:
-      group_name:
-        description: 'Security Group Name'
-        required: true
-        default: 'Test-Group-Terraform'
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/create-group-terraform.yml'
 
 permissions:
   id-token: write
@@ -20,7 +20,6 @@ jobs:
         working-directory: ./terraform
 
     env:
-      # These are used by the BACKEND (azurerm) for state storage (tenant 2)
       ARM_USE_OIDC: true
       ARM_CLIENT_ID: ${{ secrets.AZURE_STATE_CLIENT_ID }}
       ARM_TENANT_ID: ${{ secrets.AZURE_STATE_TENANT_ID }}
@@ -44,13 +43,11 @@ jobs:
       - name: Terraform Plan
         run: |
           terraform plan \
-            -var="group_name=${{ github.event.inputs.group_name }}" \
             -var="entra_client_id=${{ secrets.AZURE_CLIENT_ID }}" \
             -var="entra_tenant_id=${{ secrets.AZURE_TENANT_ID }}"
 
       - name: Terraform Apply
         run: |
           terraform apply -auto-approve \
-            -var="group_name=${{ github.event.inputs.group_name }}" \
             -var="entra_client_id=${{ secrets.AZURE_CLIENT_ID }}" \
             -var="entra_tenant_id=${{ secrets.AZURE_TENANT_ID }}"
