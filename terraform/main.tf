@@ -4,3 +4,4 @@ resource "azuread_group" "security_group" {
   security_enabled = true
   mail_enabled     = false
 }
+
