@@ -1,7 +1,7 @@
 variable "group_name" {
   description = "Display name of the security group to create"
   type        = string
-  default     = "Test-Group-Terraform"
+  default     = "Test-Group-Terraform1"
 }
 
 variable "group_description" {
