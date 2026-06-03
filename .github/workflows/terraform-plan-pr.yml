@@ -1,0 +1,99 @@
+name: Terraform Plan (PR)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform-plan-pr.yml'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./terraform
+
+    env:
+      ARM_USE_OIDC: true
+      ARM_CLIENT_ID: ${{ secrets.AZURE_STATE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_STATE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_STATE_SUBSCRIPTION_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.AZURE_STATE_RG }}" \
+            -backend-config="storage_account_name=${{ secrets.AZURE_STATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=entra-security-group.tfstate"
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check
+        continue-on-error: true
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -no-color \
+            -var="entra_client_id=${{ secrets.AZURE_CLIENT_ID }}" \
+            -var="entra_tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
+            -out=tfplan
+          terraform show -no-color tfplan > plan.txt
+        continue-on-error: true
+
+      - name: Post Plan to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/plan.txt', 'utf8');
+            const maxLength = 65000;
+            const truncatedPlan = plan.length > maxLength 
+              ? plan.substring(0, maxLength) + '\n\n... (truncated)' 
+              : plan;
+            
+            const body = `### Terraform Plan 📋
+
+            **Format check:** \`${{ steps.fmt.outcome }}\`
+            **Validation:** \`${{ steps.validate.outcome }}\`
+            **Plan:** \`${{ steps.plan.outcome }}\`
+
+            <details>
+            <summary>Show Plan</summary>
+
+            \`\`\`hcl
+            ${truncatedPlan}
+            \`\`\`
+
+            </details>
+
+            *Pushed by: @${{ github.actor }}*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Fail if Plan Failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
