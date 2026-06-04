@@ -1,10 +1,22 @@
-variable "group_name" {
+variable "group_name-first" {
   description = "Display name of the security group to create"
   type        = string
-  default     = "Test-Group-Terraform1"
+  default     = "Test-Group-Terraform-1"
 }
 
-variable "group_description" {
+variable "group_description-first" {
+  description = "Description of the security group"
+  type        = string
+  default     = "Created via Terraform"
+}
+
+variable "group_name-second" {
+  description = "Display name of the security group to create"
+  type        = string
+  default     = "Test-Group-Terraform-2"
+}
+
+variable "group_description-second" {
   description = "Description of the security group"
   type        = string
   default     = "Created via Terraform"
