@@ -6,6 +6,7 @@ on:
     paths:
       - 'terraform/**'
       - '.github/workflows/terraform-plan-pr.yml'
+      - '.github/workflows/create-group-terraform.yml'
 
 permissions:
   id-token: write
