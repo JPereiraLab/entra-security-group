@@ -14,16 +14,15 @@ Three implementations of the same goal — create an Entra security group from C
 
 | Workflow | File | Approach |
 |----------|------|----------|
-| Manual OIDC | `create-group-manual-oidc.yml` | Raw REST calls, manual token exchange. Educational — shows the underlying OAuth2/OIDC mechanics |
-| Azure Login Action | `create-group-azure-login.yml` | Uses `azure/login@v2` and `az ad group create`. Concise, maintained by Microsoft |
-| Terraform (GitOps) | `create-group-terraform.yml` | Full IaC with remote state, PR-gated plan/apply pipeline |
+| Manual OIDC | `group-manual-oidc.yml` | Raw REST calls, manual token exchange. Educational — shows the underlying OAuth2/OIDC mechanics |
+| Azure Login Action | `group-azure-login.yml` | Uses `azure/login@v2` and `az ad group create`. Concise, maintained by Microsoft |
+| Terraform (GitOps) | `terraform-apply.yml` + `terraform-plan.yml` | Full IaC with remote state, PR-gated plan/apply pipeline |
 
 All three authenticate using OIDC federation — no client secrets, no certificate rotation.
 
 ---
 
 ## Authentication Architecture
-
 
 GitHub Actions Runner
 │
@@ -45,8 +44,6 @@ Access Token (Microsoft Graph)
 │  3. Create/manage security group
 ▼
 Microsoft Graph API ──► Group Created ✅
-
-
 
 ### Cross-Tenant Setup
 
@@ -92,17 +89,16 @@ Each app has two federated credentials:
 entra-security-group/
 ├── .github/
 │   └── workflows/
-│       ├── create-group-manual-oidc.yml      # Approach 1: Raw REST
-│       ├── create-group-azure-login.yml      # Approach 2: Azure Login action
-│       ├── create-group-terraform.yml        # Approach 3: Terraform apply (main)
-│       └── terraform-plan-pr.yml             # Approach 3: Terraform plan (PRs)
+│       ├── group-manual-oidc.yml    # Approach 1: Raw REST + manual OIDC token exchange
+│       ├── group-azure-login.yml    # Approach 2: azure/login@v2 + Azure CLI
+│       ├── terraform-plan.yml       # Approach 3: Terraform plan (pull requests)
+│       └── terraform-apply.yml      # Approach 3: Terraform apply (merge to main)
 ├── terraform/
-│   ├── providers.tf                          # AzureAD provider + remote backend
-│   ├── main.tf                               # Security group resources
-│   ├── variables.tf                          # Input variables
-│   └── outputs.tf                            # Group IDs and names
+│   ├── providers.tf                 # AzureAD provider + remote backend
+│   ├── main.tf                      # Security group resources
+│   ├── variables.tf                 # Input variables
+│   └── outputs.tf                   # Group IDs and names
 └── README.md
-
 
 ---
 
@@ -131,16 +127,15 @@ Resources are managed through code — not runtime inputs.
 
 ## GitOps Flow
 
-
 Create branch
 │
 ▼
 Edit terraform/
 │
 ▼
-Open PR ──► terraform fmt    (is code tidy?)
-──► terraform validate (is code correct?)
-──► terraform plan     (what will change?)
+Open PR ──► terraform fmt      (is code tidy?)
+──► terraform validate  (is code correct?)
+──► terraform plan      (what will change?)
 ──► Post plan as PR comment
 │
 │  Plan shows: 1 to add, 0 to change, 0 to destroy
@@ -149,7 +144,6 @@ Review and merge PR
 │
 ▼
 Push to main ──► terraform apply ──► Entra updated ✅
-
 
 **Branch protection on `main` enforces:**
 - No direct commits — all changes via PR
@@ -161,21 +155,21 @@ Push to main ──► terraform apply ──► Entra updated ✅
 ## Key Concepts
 
 **OIDC Workload Identity Federation**
-Trust relationship between GitHub and Entra. GitHub proves workflow identity 
+Trust relationship between GitHub and Entra. GitHub proves workflow identity
 via a short-lived signed JWT. No secrets stored anywhere.
 
 **Idempotency**
-Running the same workflow multiple times produces the same result. 
-Terraform tracks state — if a group already exists and matches config, 
+Running the same workflow multiple times produces the same result.
+Terraform tracks state — if a group already exists and matches config,
 nothing changes.
 
 **Remote State**
-Terraform's record of what it has created, stored in Azure Blob Storage. 
-Enables idempotency across workflow runs and state locking to prevent 
+Terraform's record of what it has created, stored in Azure Blob Storage.
+Enables idempotency across workflow runs and state locking to prevent
 concurrent modifications.
 
 **Path Filters**
-Workflows only trigger when relevant files change. Editing a README 
+Workflows only trigger when relevant files change. Editing a README
 does not trigger a Terraform plan.
 
 **Declarative vs Imperative**
@@ -189,11 +183,9 @@ does not trigger a Terraform plan.
 | Aspect | Manual OIDC | Azure Login | Terraform |
 |--------|-------------|-------------|-----------|
 | Lines of code | ~55 | ~25 | ~30 + workflow |
-| Auth handling | Manual | `azure/login@v2` | ARM env vars |
+| Auth handling | Manual REST | `azure/login@v2` | ARM env vars |
 | State tracking | None | None | Remote state |
 | Idempotent | ❌ | ❌ | ✅ |
 | GitOps capable | ❌ | ❌ | ✅ |
 | Educational value | ⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ |
 | Production ready | ❌ | ✅ | ✅ |
-
-
